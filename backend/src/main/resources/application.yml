@@ -1,0 +1,80 @@
+server:
+  port: 9100
+
+spring:
+  application:
+    name: jmqtt-admin
+  jackson:
+    default-property-inclusion: non_null
+  task:
+    scheduling:
+      # 三个定时任务各自独立: Redis 探活 / 令牌清理 / 排水推进。
+      # 池大小至少 3 —— 排水推进每 2 秒跑一次, 若与「Redis 探活失败要等一次命令超时」
+      # 共用唯一线程, 排水流程会被拖慢, 表现为进度更新一卡一卡
+      pool:
+        size: 3
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+#--------------------------------------------------------------------
+# jmqtt-admin
+#--------------------------------------------------------------------
+jmqtt:
+  admin:
+    # 登录凭据。仅适用于内网管理台: 没有密码强度策略、失败锁定与审计留痕。
+    # 若要暴露到更大范围, 应改为接企业统一登录, 而不是在这里加字段
+    username: jmqtt
+    password: jmqtt
+    token-ttl-seconds: 28800
+
+    # ★ 单次驱逐上限。与 broker 的 jmqtt.broker.admin.max-evict-per-task 是双重闸门:
+    # 控制台先拦一次并给出「建议比例」这类可执行提示, broker 再兜一次防止绕过控制台直连 Redis。
+    # 分批慢速驱逐不是性能取舍 —— 断连必然触发遗嘱发布, 一次断掉十万客户端
+    # 等于制造十万条遗嘱风暴, 而设备并没有真的下线
+    max-evict-per-task: 5000
+    # 命令最大容忍年龄。超龄命令会被节点拒绝执行 ——
+    # 一条一小时后才被执行的驱逐命令, 打的流量形态已完全不同
+    command-max-age-ms: 60000
+    default-evict-batch-size: 200
+    default-evict-interval-ms: 500
+
+    # 单次 HSCAN 最多返回多少条。HSCAN 本身是游标式的, 这里限制的是「一次给多少」,
+    # 防止一个页面把十几万条客户端全拉出来
+    max-scan-count: 2000
+    # 心跳超过多久视为离线。不能只靠「键是否存在」: 节点进程卡死(例如长时间 Full GC)时
+    # 键还没到 TTL, 但它已经不在正常工作了
+    node-stale-after-ms: 25000
+
+    # ---- 排水流程 ----
+    # 预检观测窗口。用来观察「停止调度之后, 新连接是否还在进来」——
+    # 这是判断停调度是否真正生效的唯一客观证据
+    precheck-window-ms: 8000
+    # 窗口内新增连接数超过该值即告警。取值偏严是有意的: 误报的代价是让人多看一眼,
+    # 漏报的代价是驱逐变成「断开→从同一入口重连」的死循环
+    precheck-growth-threshold: 5
+    # 等待客户端重连到其他节点的时限
+    reconnect-timeout-seconds: 180
+    # 排水流程推进间隔
+    reconnect-poll-interval-ms: 2000
+
+    # ---- Redis ----
+    # ★ key-prefix 必须与 broker 的 jmqtt.broker.redis.key-prefix 一致。
+    # 两个工程之间唯一的契约就是「键长什么样」, 配错了不报错, 只表现为「控制台里一个人都没有」
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password:
+      database: 0
+      key-prefix: jmqtt
+      command-timeout-ms: 3000
+    # Redis 探活间隔。控制台不做静默重试, 这是「Redis 回来了」的唯一发现途径
+    redis-health-interval-ms: 5000
+
+logging:
+  level:
+    root: INFO
+    online.ipuff.jmqtt: DEBUG

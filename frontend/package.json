@@ -1,0 +1,26 @@
+{
+  "name": "jmqtt-admin-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "MQTT broker fleet administration console (frontend)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:nowasm": "node build.mjs",
+    "preview": "vite preview",
+    "test": "node tests/render-smoke.mjs"
+  },
+  "dependencies": {
+    "vue": "^3.5.13",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/compiler-sfc": "^3.5.42",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^20.14.5",
+    "vite": "^6.0.0"
+  }
+}
