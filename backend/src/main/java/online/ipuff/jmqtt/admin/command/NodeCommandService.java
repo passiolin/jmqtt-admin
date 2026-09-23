@@ -56,6 +56,12 @@ public class NodeCommandService {
      */
     private static final int MAX_QUEUE_LENGTH = 20;
 
+    /**
+     * 例行采集命令: 由指标采集器周期性下发, dispatch 对它按 DEBUG 留痕。
+     * 字符串必须与 broker 侧 {@code AdminCommand.TYPE_METRICS} 一致(无编译期检查的契约)。
+     */
+    private static final String TYPE_METRICS = "METRICS";
+
     private final AdminRedis redis;
     private final AdminKeys keys;
     private final AdminProperties properties;
@@ -89,7 +95,7 @@ public class NodeCommandService {
      * 指标由节点自算自存, 这里只按需下发查询命令 —— 指标链路无常驻 Redis 写入。
      */
     public String nodeMetrics(String nodeId) {
-        return dispatch(nodeId, base("METRICS"));
+        return dispatch(nodeId, base(TYPE_METRICS));
     }
 
     /**
@@ -197,7 +203,11 @@ public class NodeCommandService {
                 log.error("命令下发失败(Redis 不可达): node={} type={}", nodeId, command.get("type"));
                 return null;
             }
-            log.info("命令已下发: node={} type={} id={}", nodeId, command.get("type"), commandId);
+            // METRICS 由采集器周期性下发, 属后台例行流量 —— 按 DEBUG 留痕,
+            // 否则每个在线节点每 30s 刷一条 INFO; 人工触发的命令仍保留 INFO
+            if (!TYPE_METRICS.equals(command.get("type"))) {
+                log.info("命令已下发: node={} type={} id={}", nodeId, command.get("type"), commandId);
+            }
             return commandId;
         } catch (Exception e) {
             log.error("命令序列化失败: node={} type={}", nodeId, command.get("type"), e);
