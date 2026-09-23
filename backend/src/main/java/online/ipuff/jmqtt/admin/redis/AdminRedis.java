@@ -15,11 +15,8 @@ package online.ipuff.jmqtt.admin.redis;
 
 import io.lettuce.core.KeyValue;
 import io.lettuce.core.MapScanCursor;
-import io.lettuce.core.RedisClient;
 import io.lettuce.core.ScanArgs;
 import io.lettuce.core.ScanCursor;
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.sync.RedisCommands;
 import online.ipuff.jmqtt.admin.AdminProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,11 +50,11 @@ public class AdminRedis {
 
     private static final Logger log = LoggerFactory.getLogger(AdminRedis.class);
 
-    private final RedisClient client;
+    private final AdminRedisSource source;
     private final AdminKeys keys;
     private final int maxScanCount;
 
-    private volatile StatefulRedisConnection<String, String> connection;
+    private volatile AdminRedisSource.Handle connection;
     private volatile Status status = new Status(false, "尚未连接", 0L);
 
     /**
@@ -81,8 +78,8 @@ public class AdminRedis {
     public record ScanResult(Map<String, String> entries, String cursor, boolean finished, long total) {
     }
 
-    public AdminRedis(RedisClient client, AdminProperties properties, AdminKeys keys) {
-        this.client = client;
+    public AdminRedis(AdminRedisSource source, AdminProperties properties, AdminKeys keys) {
+        this.source = source;
         this.keys = keys;
         this.maxScanCount = properties.maxScanCount();
     }
@@ -120,8 +117,8 @@ public class AdminRedis {
         }
     }
 
-    public RedisCommands<String, String> commands() {
-        return connection().sync();
+    public AdminCommands commands() {
+        return connection().commands();
     }
 
     // ------------------------------------------------------------------
@@ -239,16 +236,16 @@ public class AdminRedis {
      * 惰性连接。与 broker 一致: <b>不在启动时连接</b> ——
      * Redis 挂掉不应该导致控制台起不来(它至少还能把「连不上」这个事实展示出来)。
      */
-    private StatefulRedisConnection<String, String> connection() {
-        StatefulRedisConnection<String, String> current = connection;
-        if (current != null && current.isOpen()) {
+    private AdminRedisSource.Handle connection() {
+        AdminRedisSource.Handle current = connection;
+        if (current != null && current.connection().isOpen()) {
             return current;
         }
         synchronized (this) {
-            if (connection != null && connection.isOpen()) {
+            if (connection != null && connection.connection().isOpen()) {
                 return connection;
             }
-            connection = client.connect();
+            connection = source.open();
             return connection;
         }
     }

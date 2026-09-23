@@ -81,13 +81,18 @@ public record AdminProperties(
      * 控制台与 broker 是两个独立进程, 它们之间唯一的契约就是「键长什么样」——
      * 这个契约没有编译期检查, 配错了表现为「控制台空无一人」而不是报错。
      *
-     * @param host             Redis 地址
-     * @param port             Redis 端口
+     * @param host             Redis 地址(standalone 模式)
+     * @param port             Redis 端口(standalone 模式)
      * @param password         密码, 留空表示无密码
-     * @param database         库号
+     * @param database         库号(集群模式必须为 0 —— Redis Cluster 只有 db0)
      * @param keyPrefix        键前缀, 必须与 broker 一致
      * @param commandTimeoutMs 命令超时。控制台是只读方, 超时设大一点无妨,
      *                         但要有限: 否则一个卡住的 Redis 会拖住所有前端请求
+     * @param mode             部署模式: {@code standalone}(默认)/{@code sentinel}/
+     *                         {@code cluster}。与 broker 的 redis.mode 语义一致
+     * @param masterId         哨兵模式的主节点名称(sentinel monitor 的名字), 仅 sentinel 需要
+     * @param nodes            哨兵/集群的节点地址列表(host:port)。sentinel 列哨兵进程,
+     *                         cluster 列种子节点(任一可达即可)
      */
     public record RedisProperties(
             @DefaultValue("127.0.0.1") String host,
@@ -95,7 +100,18 @@ public record AdminProperties(
             @DefaultValue("") String password,
             @DefaultValue("0") @Min(0) int database,
             @DefaultValue("jmqtt") String keyPrefix,
-            @DefaultValue("3000") @Min(100) int commandTimeoutMs
+            @DefaultValue("3000") @Min(100) int commandTimeoutMs,
+            @DefaultValue("standalone") String mode,
+            @DefaultValue("") String masterId,
+            @DefaultValue("[]") java.util.List<String> nodes
     ) {
+
+        public boolean sentinelMode() {
+            return "sentinel".equalsIgnoreCase(mode);
+        }
+
+        public boolean clusterMode() {
+            return "cluster".equalsIgnoreCase(mode);
+        }
     }
 }
