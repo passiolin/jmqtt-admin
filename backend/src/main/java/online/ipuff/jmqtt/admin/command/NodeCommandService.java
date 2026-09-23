@@ -74,6 +74,50 @@ public class NodeCommandService {
      *                    只在「确认观察方不需要这个离线信号」时使用
      * @return 命令 id; 下发失败时返回 null
      */
+    /**
+     * 查询某客户端<b>当下</b>的完整状态快照(含订阅列表)。
+     * 按需查询 —— 订阅不实时上报, 控制台点开详情时才让节点现场构建。
+     */
+    public String clientDetail(String nodeId, String clientId) {
+        Map<String, Object> command = base("CLIENT_DETAIL");
+        command.put("clientId", clientId);
+        return dispatch(nodeId, command);
+    }
+
+    /**
+     * 开始一个消息监听任务(参数校验后的上限在 broker 侧再拦一次)。
+     */
+    public String captureStart(String nodeId, String captureId, String filter,
+                               int durationMinutes, int maxMessages) {
+        return captureStart(nodeId, captureId, filter, null, durationMinutes, maxMessages);
+    }
+
+    /**
+     * 客户端维度 clientId 非空时, 抓该客户端发布与收到的全部消息(方向带在记录里)。
+     */
+    public String captureStart(String nodeId, String captureId, String filter, String clientId,
+                               int durationMinutes, int maxMessages) {
+        Map<String, Object> command = base("CAPTURE_START");
+        Map<String, Object> capture = new java.util.HashMap<>(Map.of(
+                "id", captureId,
+                "durationMinutes", durationMinutes,
+                "maxMessages", maxMessages));
+        if (clientId != null && !clientId.isBlank()) {
+            capture.put("clientId", clientId);
+        } else {
+            capture.put("filter", filter);
+        }
+        command.put("capture", capture);
+        return dispatch(nodeId, command);
+    }
+
+    /** 停止一个消息监听任务(broker 停止写入, 数据保留) */
+    public String captureStop(String nodeId, String captureId) {
+        Map<String, Object> command = base("CAPTURE_STOP");
+        command.put("captureId", captureId);
+        return dispatch(nodeId, command);
+    }
+
     public String kick(String nodeId, String clientId, boolean publishWill) {
         Map<String, Object> command = base("KICK");
         command.put("clientId", clientId);

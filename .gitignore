@@ -29,3 +29,6 @@ target/
 *.iml
 node_modules/
 frontend/dist/
+
+# 前端独立部署, 构建产物不进后端
+backend/src/main/resources/static/

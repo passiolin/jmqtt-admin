@@ -6,8 +6,8 @@ MQTT 集群管理台。看到集群里有什么、把某个节点的客户端迁
 
 ```
 jmqtt-admin/
-├── backend/    Spring Boot 2.7.18 + Java 21, 只读 Redis + 只写命令
-└── frontend/   Vue 3 + Vite, 构建产物打进 backend 的静态资源目录(单 jar 部署)
+├── backend/    Spring Boot 2.7.18 + Java 21, 只提供 /api, 不含任何页面
+└── frontend/   Vue 3 + Vite, 产物在 frontend/dist 由前端独立部署(Nginx/CDN)
 ```
 
 ---

@@ -23,8 +23,11 @@ import online.ipuff.jmqtt.admin.query.ClusterQueryService.OverlapReport;
 import online.ipuff.jmqtt.admin.query.ClusterQueryService.TopicEntry;
 import online.ipuff.jmqtt.admin.query.ClusterQueryService.TopicPage;
 import online.ipuff.jmqtt.admin.query.NodeView;
+import online.ipuff.jmqtt.admin.redis.AdminKeys;
 import online.ipuff.jmqtt.admin.redis.AdminRedis;
+import online.ipuff.jmqtt.admin.registry.NodeRegistryService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,13 +55,145 @@ public class AdminApiController {
     private final NodeCommandService commands;
     private final AdminRedis redis;
     private final AdminProperties properties;
+    private final NodeRegistryService registry;
+    private final AdminKeys keys;
 
     public AdminApiController(ClusterQueryService query, NodeCommandService commands,
-                              AdminRedis redis, AdminProperties properties) {
+                              AdminRedis redis, AdminProperties properties,
+                              NodeRegistryService registry, AdminKeys keys) {
         this.query = query;
         this.commands = commands;
         this.redis = redis;
         this.properties = properties;
+        this.registry = registry;
+        this.keys = keys;
+    }
+
+    // ------------------------------------------------------------------
+    // 消息监听(topic 订阅录制)
+    // ------------------------------------------------------------------
+
+    /**
+     * 发起一个监听任务(异步命令): 返回 commandId, 前端轮询确认节点已受理。
+     * 抓到的消息写 Redis(3 天过期), 用 {@code GET /api/captures/{id}/messages} 查看。
+     */
+    @PostMapping("/captures")
+    public ResponseEntity<Map<String, Object>> startCapture(@RequestBody CaptureRequest request) {
+        boolean byClient = request.clientId() != null && !request.clientId().isBlank();
+        if (!byClient && (request.filter() == null || request.filter().isBlank())) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("过滤器与 clientId 至少提供一个"));
+        }
+        int duration = Math.max(1, Math.min(request.durationMinutes() == null
+                ? 10 : request.durationMinutes(), 24 * 60));
+        int max = Math.max(1, Math.min(request.maxMessages() == null
+                ? 1000 : request.maxMessages(), 10_000));
+        String captureId = "cap-" + Long.toHexString(System.currentTimeMillis()) + "-"
+                + Integer.toHexString(java.util.concurrent.ThreadLocalRandom.current().nextInt(0xffff));
+        String commandId = commands.captureStart(request.node(), captureId,
+                byClient ? null : request.filter(), byClient ? request.clientId() : null,
+                duration, max);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("commandId", commandId);
+        data.put("captureId", captureId);
+        return ResponseEntity.ok(ApiResponse.ok(data));
+    }
+
+    /**
+     * 全部监听任务(从 Redis 注册表发现, 含已结束 —— 终态任务保留给 TTL 回收或人工删除)。
+     */
+    @GetMapping("/captures")
+    public ResponseEntity<Map<String, Object>> captures() {
+        List<Map<String, String>> captures = new ArrayList<>();
+        for (String id : new java.util.TreeSet<>(redis.smembers(keys.captures()))) {
+            Map<String, String> meta = redis.hgetAll(keys.capture(id));
+            if (meta.isEmpty()) {
+                continue; // 元数据已过期(TTL), 注册表成员残留, 跳过
+            }
+            captures.add(meta);
+        }
+        return ResponseEntity.ok(ApiResponse.ok(captures));
+    }
+
+    /**
+     * 某监听任务的消息(新的在前, limit 条)。
+     */
+    @GetMapping("/captures/{captureId}/messages")
+    public ResponseEntity<Map<String, Object>> captureMessages(@PathVariable String captureId,
+                                                               @RequestParam(defaultValue = "200") int limit) {
+        Map<String, String> meta = redis.hgetAll(keys.capture(captureId));
+        if (meta.isEmpty()) {
+            return ResponseEntity.status(404).body(ApiResponse.fail("监听任务不存在或已过期: " + captureId));
+        }
+        List<String> messages = redis.lrange(keys.captureMessages(captureId), 0,
+                Math.max(1, Math.min(limit, 1000)) - 1L);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("meta", meta);
+        data.put("messages", messages);
+        return ResponseEntity.ok(ApiResponse.ok(data));
+    }
+
+    /**
+     * 删除一个监听任务: 先发停止命令(节点停止写入), 再清 Redis 数据与注册。
+     * 停止命令是异步的 —— 极小窗口内节点可能再写一条消息, 该残留键 3 天 TTL 自然回收。
+     */
+    @DeleteMapping("/captures/{captureId}")
+    public ResponseEntity<Map<String, Object>> deleteCapture(@PathVariable String captureId,
+                                                             @RequestParam String node) {
+        try {
+            commands.captureStop(node, captureId);
+        } catch (Exception e) {
+            // 节点可能已下线 —— 数据照删, 命令随队列过期
+        }
+        redis.srem(keys.captures(), captureId);
+        redis.del(keys.capture(captureId), keys.captureMessages(captureId));
+        return ResponseEntity.ok(ApiResponse.ok());
+    }
+
+    /** {@link #startCapture} 的请求体; clientId 与 filter 二选一(客户端维度优先) */
+    public record CaptureRequest(String node, String filter, String clientId,
+                                 Integer durationMinutes, Integer maxMessages) {
+    }
+
+    /**
+     * 按需查询客户端<b>当下</b>的状态快照(含订阅)。
+     * 订阅不随变化实时上报(写放大不配人工查看的低频) —— 通过命令通道让节点现场构建,
+     * 异步返回 commandId, 前端轮询 {@code /api/commands/{id}} 取 snapshot 字段。
+     */
+    @PostMapping("/clients/fetch-detail")
+    public ResponseEntity<Map<String, Object>> fetchClientDetail(@RequestBody FetchDetailRequest request) {
+        String commandId = commands.clientDetail(request.node(), request.clientId());
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("commandId", commandId)));
+    }
+
+    /** {@link #fetchClientDetail} 的请求体 */
+    public record FetchDetailRequest(String node, String clientId) {
+    }
+
+    /**
+     * 订阅过滤器的订阅者清单(跨节点扫描)。
+     * 注意 filter 是精确匹配的过滤器串; 结果可能因客户端侧 filters 截断而不全,
+     * 响应里的 scanned/truncated 说明可信度。
+     */
+    @GetMapping("/filters/detail")
+    public ResponseEntity<Map<String, Object>> filterDetail(@RequestParam String filter,
+                                                            @RequestParam(defaultValue = "200") int limit) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                query.filterDetail(filter, Math.max(1, Math.min(limit, 500)))));
+    }
+
+    /**
+     * 删除一个确认离线的节点(注册表成员 + 遗留键)。
+     * 只删离线的: 在线节点的注册被删掉会让它在下一个心跳前从总览消失,
+     * 驱逐基线也会错一位 —— 服务层拒绝, 这里如实转达原因。
+     */
+    @DeleteMapping("/nodes/{nodeId}")
+    public ResponseEntity<Map<String, Object>> removeNode(@PathVariable String nodeId) {
+        try {
+            registry.removeOffline(nodeId);
+            return ResponseEntity.ok(ApiResponse.ok());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
     }
 
     /**
@@ -173,7 +309,7 @@ public class AdminApiController {
     /**
      * 踢掉单个客户端。
      *
-     * <p>注意这与排水是同一套动作, 只是规模为 1 —— 会话与订阅都不会被删除,
+     * <p>注意这与驱逐是同一套动作, 只是规模为 1 —— 会话与订阅都不会被删除,
      * 客户端会立刻重连并恢复。
      */
     @PostMapping("/nodes/{node}/clients/{clientId}/kick")
@@ -189,7 +325,7 @@ public class AdminApiController {
     }
 
     /**
-     * 查询命令结果/进度。排水与踢下线共用这一个入口 ——
+     * 查询命令结果/进度。驱逐与踢下线共用这一个入口 ——
      * 它们的区别只是命令类型, 结果形状是一致的。
      */
     @GetMapping("/commands/{commandId}")

@@ -17,10 +17,9 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   build: {
-    // 构建产物直接落到后端的静态资源目录, 于是最终只有一个 jar 需要部署。
-    // 这不是为了省事: 两个产物分开意味着「前端更新了但后端没更新」这种不一致状态
-    // 会真实存在, 而它是一个版本号说不清的问题。
-    outDir: '../backend/src/main/resources/static',
+    // 产物留在 frontend/dist, 由前端自行部署(Nginx/CDN), 不打进后端 jar ——
+    // 后端 jar 只提供 /api。开发走 vite dev(5173, /api 代理到后端)。
+    outDir: 'dist',
     emptyOutDir: true,
     chunkSizeWarningLimit: 900
   },

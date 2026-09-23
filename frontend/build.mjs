@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { baseOptions, createVuePlugins } from './vue-plugin.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const outDir = path.resolve(here, '../backend/src/main/resources/static')
+const outDir = path.resolve(here, 'dist')
 
 const styleWarnings = []
 

@@ -82,8 +82,10 @@
           </tr>
           </thead>
           <tbody>
-          <tr v-for="t in entries" :key="t.topicFilter">
-            <td class="mono">{{ t.topicFilter }}</td>
+          <tr v-for="t in entries" :key="t.topicFilter"
+              class="clickable" @click="openSubscribers(t.topicFilter)"
+              title="点击查看订阅该过滤器的客户端">
+            <td class="mono topic-link">{{ t.topicFilter }}</td>
             <td class="num">
               {{ t.subscribers }}
               <span v-if="t.nodes.length > 1" class="tag warn" style="margin-left:4px">
@@ -106,12 +108,61 @@
       <button class="small" :disabled="loading" @click="loadMore">加载更多</button>
     </div>
   </div>
+
+  <!-- 订阅者浮窗: 点击主题过滤器的客户端清单, 点客户端跳转客户端页 -->
+  <div v-if="subOpen" class="modal-mask" @click.self="closeSubscribers">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 class="mono" style="font-size:13.5px;word-break:break-all">{{ subFilter }}</h2>
+        <button class="small" :disabled="!captureNode"
+                @click="captureOpen = true" :title="captureNode ? '' : '多节点分布时请在上方选择节点'">
+          监听
+        </button>
+      </div>
+      <div class="modal-body">
+        <div v-if="subLoading" class="loading" style="margin-top:12px">扫描各节点客户端中…</div>
+        <template v-else-if="subDetail">
+          <dl class="kv two-col" style="margin-top:10px">
+            <div><dt>订阅者</dt><dd>{{ subDetail.subscribers.length }} 个</dd></div>
+            <div><dt>扫描范围</dt><dd>{{ subDetail.scanned }} 个客户端字段</dd></div>
+          </dl>
+          <div v-if="subDetail.truncated" class="banner warn" style="margin:8px 0">
+            结果不完整(达到扫描或返回上限)—— 订阅数超过上报上限的客户端不会出现在这里
+          </div>
+          <div class="scroll" style="max-height:50vh">
+            <table>
+              <thead><tr><th>clientId</th><th>节点</th><th>在线时长</th><th></th></tr></thead>
+              <tbody>
+              <tr v-for="sub in subDetail.subscribers"
+                  :key="sub.node + '/' + sub.clientId" class="clickable"
+                  @click="gotoClient(sub)" title="跳转客户端页查看详情">
+                <td class="mono entity">{{ sub.clientId }}</td>
+                <td><span class="tag">{{ sub.node }}</span></td>
+                <td class="num">{{ onlineFor(sub.attributes.connectedAt) }}</td>
+                <td><span style="color:var(--accent,#4a90d9);font-size:12px">详情 →</span></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="hint" style="margin-top:8px">
+            点击订阅者跳转客户端页(按该 clientId 前缀过滤), 在那里可查看连接/会话/订阅详情。
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+  <CaptureDialog :open="captureOpen" :node="captureNode" :filter="subFilter"
+                 @close="captureOpen = false"
+                 @started="closeSubscribers"/>
+
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../api.js'
-import { num } from '../format.js'
+import { duration, num } from '../format.js'
+import CaptureDialog from '../components/CaptureDialog.vue'
 
 const PAGE_SIZE = 100
 const AGGREGATE_LIMIT = 300
@@ -129,6 +180,52 @@ const truncated = ref(false)
 const loading = ref(false)
 
 const nodeIds = computed(() => nodes.value.map((n) => n.node))
+
+const router = useRouter()
+const subOpen = ref(false)
+const subFilter = ref('')
+const subDetail = ref(null)
+const subLoading = ref(false)
+const captureOpen = ref(false)
+
+/** 监听要发往具体节点: 订阅者全在一个节点时用它, 否则用当前筛选的节点(全部时禁用) */
+const captureNode = computed(() => {
+  const subs = subDetail.value?.subscribers || []
+  if (subs.length === 1) {
+    return subs[0].node
+  }
+  return node.value || ''
+})
+
+function onlineFor(connectedAt) {
+  return connectedAt ? duration(Date.now() - connectedAt) : '-'
+}
+
+/** 点主题过滤器 → 订阅者清单(跨节点扫描) */
+async function openSubscribers(topicFilter) {
+  subFilter.value = topicFilter
+  subOpen.value = true
+  subDetail.value = null
+  subLoading.value = true
+  try {
+    subDetail.value = await api.filterDetail(topicFilter)
+  } catch (e) {
+    subDetail.value = { subscribers: [], scanned: 0, truncated: false, error: e.message }
+  } finally {
+    subLoading.value = false
+  }
+}
+
+function closeSubscribers() {
+  subOpen.value = false
+  subDetail.value = null
+}
+
+/** 点订阅者 → 跳转客户端页并按 clientId 精确过滤 */
+function gotoClient(sub) {
+  closeSubscribers()
+  router.push({ path: '/clients', query: { clientId: sub.clientId, node: sub.node } })
+}
 
 async function loadNodes() {
   try {
@@ -196,3 +293,67 @@ onMounted(async () => {
   await reload()
 })
 </script>
+
+
+<style scoped>
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  width: min(640px, 92vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modal-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+}
+
+.modal-body {
+  overflow-y: auto;
+  padding: 0 16px 20px;
+  flex: 1;
+}
+
+.kv.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+}
+
+.kv.two-col dt {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.kv.two-col dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+</style>

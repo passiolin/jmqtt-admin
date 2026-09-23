@@ -13,7 +13,7 @@
 -->
 <template>
   <div class="banner info">
-    <h4>排水是什么, 以及它为什么需要四步</h4>
+    <h4>驱逐是什么, 以及它为什么需要四步</h4>
     <div style="font-size:12.5px">
       把某个节点上的客户端<b>迁到其他节点</b>。断连必然触发遗嘱发布, 一次性断掉大量连接会同时
       制造遗嘱风暴与重连风暴, 所以必须分批、并且先确认负载均衡确实不再向该节点调度 ——
@@ -23,7 +23,7 @@
 
   <div class="card">
     <div class="card-head">
-      <h2>新建排水任务</h2>
+      <h2>新建驱逐任务</h2>
     </div>
     <div class="card-body">
       <div class="row">
@@ -226,7 +226,7 @@
       <h2>历史任务</h2>
       <button class="small" @click="loadDrains">刷新</button>
     </div>
-    <div v-if="!history.length" class="empty">本次会话内没有排水任务</div>
+    <div v-if="!history.length" class="empty">本次会话内没有驱逐任务</div>
     <div v-else class="card-body tight">
       <table>
         <thead>
@@ -462,7 +462,7 @@ let timer = null
 onMounted(async () => {
   await loadNodes()
   await loadDrains()
-  // 排水是异步流程, 页面靠轮询推进展示。2 秒与后端的推进节奏一致 ——
+  // 驱逐是异步流程, 页面靠轮询推进展示。2 秒与后端的推进节奏一致 ——
   // 更快只是重复读同一份状态, 更慢会让「等待重连」这一段看起来像卡住了
   timer = setInterval(refreshCurrent, 2000)
 })

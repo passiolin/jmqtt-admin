@@ -32,7 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 排水流程编排。
+ * 驱逐流程编排。
  *
  * <h2>流程, 以及每一步为什么必须存在</h2>
  * <pre>
@@ -87,7 +87,7 @@ public class DrainService {
     // ------------------------------------------------------------------
 
     /**
-     * 创建一次排水。此时只做参数校验与基线, 真正的推进由 {@link #tick()} 负责。
+     * 创建一次驱逐。此时只做参数校验与基线, 真正的推进由 {@link #tick()} 负责。
      *
      * @throws IllegalArgumentException 参数不合法或超过驱逐上限
      */
@@ -95,7 +95,7 @@ public class DrainService {
                                Integer intervalMs, boolean publishWill, String clientIdPrefix) {
         NodeView node = query.node(nodeId);
         if (!node.online()) {
-            throw new IllegalArgumentException("节点 " + nodeId + " 当前不在线, 无法排水");
+            throw new IllegalArgumentException("节点 " + nodeId + " 当前不在线, 无法驱逐");
         }
         if (!"ratio".equals(mode) && !"count".equals(mode)) {
             throw new IllegalArgumentException("mode 必须是 ratio 或 count");
@@ -134,7 +134,7 @@ public class DrainService {
         DrainSession session = new DrainSession(id, nodeId, mode, value, batch,
                 interval, publishWill, clientIdPrefix);
         sessions.put(id, session);
-        session.log("已创建排水任务: 节点=" + nodeId + " 方式=" + mode + " 值=" + value
+        session.log("已创建驱逐任务: 节点=" + nodeId + " 方式=" + mode + " 值=" + value
                 + " 每批=" + batch + " 间隔=" + interval + "ms 发布遗嘱=" + publishWill
                 + (clientIdPrefix == null || clientIdPrefix.isBlank() ? "" : " 前缀=" + clientIdPrefix));
         return session;
@@ -170,7 +170,7 @@ public class DrainService {
         }
         session.transition(DrainSession.State.LB_CONFIRMED,
                 "已确认停止向该节点调度" + (session.precheckSuspect() ? "(忽略了预检告警)" : ""));
-        log.info("排水 [{}] 已确认停调度: node={}", id, session.node());
+        log.info("驱逐 [{}] 已确认停调度: node={}", id, session.node());
     }
 
     /**
@@ -218,7 +218,7 @@ public class DrainService {
             commands.abortEviction(session.node(), session.evictCommandId());
         }
         session.finish(DrainSession.State.ABORTED, "已人工中止");
-        log.info("排水 [{}] 已中止", id);
+        log.info("驱逐 [{}] 已中止", id);
     }
 
     // ------------------------------------------------------------------
@@ -238,7 +238,7 @@ public class DrainService {
             try {
                 advance(session);
             } catch (Exception e) {
-                log.error("推进排水任务失败: id={} state={}", session.id(), session.state(), e);
+                log.error("推进驱逐任务失败: id={} state={}", session.id(), session.state(), e);
                 session.finish(DrainSession.State.FAILED, "推进出错: " + e);
             }
         }
@@ -363,9 +363,9 @@ public class DrainService {
 
         if (enoughDrop && enoughElsewhere) {
             session.finish(DrainSession.State.COMPLETED,
-                    "排水完成: 目标节点减少 " + drop + " 条, 其他节点合计增加 " + elsewhere
+                    "驱逐完成: 目标节点减少 " + drop + " 条, 其他节点合计增加 " + elsewhere
                             + " 条(计划 " + planned + " 条)");
-            log.info("排水 [{}] 完成: node={} drop={} elsewhere={}",
+            log.info("驱逐 [{}] 完成: node={} drop={} elsewhere={}",
                     session.id(), session.node(), drop, elsewhere);
             return;
         }
@@ -415,7 +415,7 @@ public class DrainService {
     private DrainSession require(String id) {
         DrainSession session = sessions.get(id);
         if (session == null) {
-            throw new IllegalArgumentException("找不到排水任务: " + id);
+            throw new IllegalArgumentException("找不到驱逐任务: " + id);
         }
         return session;
     }

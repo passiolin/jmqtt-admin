@@ -93,7 +93,7 @@ export function broadcastMode(mode) {
   }
 }
 
-/** 排水状态的中文与标签样式 */
+/** 驱逐状态的中文与标签样式 */
 export function drainState(state) {
   switch (state) {
     case 'CREATED':

@@ -65,21 +65,12 @@ jmqtt:
     # ★ key-prefix 必须与 broker 的 jmqtt.broker.redis.key-prefix 一致。
     # 两个工程之间唯一的契约就是「键长什么样」, 配错了不报错, 只表现为「控制台里一个人都没有」
     redis:
-      # 部署模式: standalone(默认) | sentinel | cluster, 语义与 broker 的 redis.mode 一致
       mode: standalone
-      host: 127.0.0.1
-      port: 6379
       password:
       database: 0
-      # 哨兵模式: sentinel monitor 的主节点名称(仅 sentinel 需要)
-      # master-id: mymaster
-      # 哨兵/集群节点列表(host:port); 集群模式 database 必须为 0。示例:
-      # nodes:
-      #   - 10.0.0.6:26379
-      #   - 10.0.0.7:26379
-      nodes: []
       key-prefix: jmqtt
       command-timeout-ms: 3000
+      nodes: []
     # Redis 探活间隔。控制台不做静默重试, 这是「Redis 回来了」的唯一发现途径
     redis-health-interval-ms: 5000
 

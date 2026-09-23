@@ -51,7 +51,13 @@ public interface AdminCommands {
 
     MapScanCursor<String, String> hscan(String key, ScanCursor cursor, ScanArgs args);
 
+    Long srem(String key, String member);
+
+    Long del(String... keys);
+
     Long lpush(String key, String... values);
+
+    List<String> lrange(String key, long start, long stop);
 
     String ltrim(String key, long start, long stop);
 }

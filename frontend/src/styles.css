@@ -20,11 +20,11 @@
   --text: #1f2429;
   --text-dim: #6b7480;
   --text-faint: #99a1ab;
-  --primary: #2b6cb0;
-  --primary-dark: #235a94;
-  --ok: #1f9254;
-  --warn: #b7791f;
-  --danger: #c0392b;
+  --primary: #1d5fbf;
+  --primary-dark: #174a96;
+  --ok: #148a43;
+  --warn: #b06e0a;
+  --danger: #cf2f1f;
   --danger-bg: #fdf2f0;
   --warn-bg: #fdf8ec;
   --ok-bg: #eef8f1;
@@ -586,4 +586,41 @@ td.num, .num {
 .kv dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
+}
+
+
+/* ------------------------------------------------------------------
+ * 信息区分: 不同类型的数据用不同颜色, 淡色页面里的视觉锚点
+ * ------------------------------------------------------------------ */
+
+/* 主题/过滤器: 主色, 它们是可点击的关联入口 */
+.mono.topic-link,
+.filter-name {
+  color: var(--primary);
+}
+
+/* clientId: 深色加粗 —— 页面的主实体 */
+.mono.entity {
+  font-weight: 600;
+}
+
+/* 关键数值: 数字是运维最先扫的信息 */
+.num-strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* tile 数值着色(在线绿/告警橙由页面指定 color) */
+.tile .value {
+  font-weight: 700;
+}
+
+/* 表格行 hover 更明显 */
+tbody tr:hover {
+  background: #eaf1fb;
+}
+
+/* 方向/状态 tag 文字加粗 */
+.tag.ok, .tag.warn, .tag.danger, .tag.info {
+  font-weight: 600;
 }

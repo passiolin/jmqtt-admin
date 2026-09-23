@@ -28,9 +28,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 排水流程接口。
+ * 驱逐流程接口。
  *
- * <h2>为什么是四个独立动作, 而不是一个「执行排水」的接口</h2>
+ * <h2>为什么是四个独立动作, 而不是一个「执行驱逐」的接口</h2>
  * 「停止负载均衡调度」这一步<b>不在控制台的权限范围内</b> —— 它可能是改 Nginx 权重、
  * 改 K8s 的 readiness、改云负载均衡的后端组, 各家的接口都不一样, 也通常需要另一套权限。
  * 控制台能做的是: 把这件事说清楚、在它没做好的时候给出证据、并且绝不在它没做之前就动手。
@@ -57,7 +57,7 @@ public class DrainController {
     }
 
     /**
-     * 创建排水任务。返回后<b>立刻</b>开始预检(异步), 前端轮询 {@code /{id}} 看预检结果。
+     * 创建驱逐任务。返回后<b>立刻</b>开始预检(异步), 前端轮询 {@code /{id}} 看预检结果。
      */
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(@RequestBody CreateRequest request) {
@@ -86,7 +86,7 @@ public class DrainController {
     public ResponseEntity<Map<String, Object>> get(@PathVariable String id) {
         DrainSession session = drainService.get(id);
         if (session == null) {
-            return ResponseEntity.status(404).body(ApiResponse.fail("找不到排水任务: " + id));
+            return ResponseEntity.status(404).body(ApiResponse.fail("找不到驱逐任务: " + id));
         }
         return ResponseEntity.ok(ApiResponse.ok(DrainView.of(session)));
     }

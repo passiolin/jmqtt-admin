@@ -80,8 +80,9 @@
           </tr>
           </thead>
           <tbody>
-          <tr v-for="c in entries" :key="c.node + '/' + c.clientId">
-            <td class="mono">{{ c.clientId }}</td>
+          <tr v-for="c in entries" :key="c.node + '/' + c.clientId"
+              class="clickable" @click="openDetail(c)" title="点击查看客户端详情">
+            <td class="mono entity">{{ c.clientId }}</td>
             <td v-if="!node"><span class="tag">{{ c.node }}</span></td>
             <td class="mono" style="color:var(--text-dim)">{{ c.attributes.addr || '-' }}</td>
             <td>
@@ -125,12 +126,115 @@
   <div v-if="kickResult" class="banner" :class="kickResult.ok ? 'info' : 'warn'">
     {{ kickResult.text }}
   </div>
+
+  <CaptureDialog :open="captureOpen" :node="drawer.client?.node || ''"
+                 :filter="captureFilter || ''" :client-id="captureClientId"
+                 @close="captureOpen = false"
+                 @started="closeDrawer"/>
+
+  <!-- 客户端详情浮窗: 两级视图 —— 客户端详情 / 订阅者清单 -->
+  <div v-if="drawer.open" class="modal-mask" @click.self="closeDrawer">
+    <div class="modal">
+      <div v-if="drawer.view === 'client'" class="modal-head">
+        <h2 class="mono" style="font-size:14px">{{ drawer.client.clientId }}</h2>
+        <div>
+          <span class="tag">{{ drawer.client.node }}</span>
+          <span v-if="detail?.attributes.persistent" class="tag ok" style="margin-left:4px">持久会话</span>
+          <button class="small" style="margin-left:8px" title="监听该客户端发布与收到的全部消息"
+                  @click="captureClient">监听</button>
+          <button class="small" style="margin-left:4px" @click="closeDrawer">关闭</button>
+        </div>
+      </div>
+      <div v-else class="modal-head">
+        <h2 class="mono" style="font-size:13.5px;word-break:break-all">{{ drawer.filter }}</h2>
+        <button class="small" @click="drawer.view = 'client'">← 返回客户端</button>
+      </div>
+
+      <div class="modal-body">
+      <template v-if="drawer.view === 'client'">
+        <div v-if="detailLoading" class="loading">加载中…</div>
+        <template v-else-if="detail">
+          <div class="drawer-section">连接</div>
+          <dl class="kv two-col">
+            <div><dt>来源地址</dt><dd class="mono">{{ detail.attributes.addr || '-' }}</dd></div>
+            <div><dt>协议</dt>
+              <dd>{{ detail.attributes.ver === 5 ? 'MQTT 5.0' : 'MQTT 3.1.1' }}
+                <span v-if="detail.attributes.receiveMax"
+                      style="color:var(--text-faint)">(Receive Maximum {{ detail.attributes.receiveMax }})</span>
+              </dd></div>
+            <div><dt>心跳</dt><dd>{{ detail.attributes.keepAlive || 0 }}s</dd></div>
+            <div><dt>接入时间</dt><dd>{{ timeStr(detail.attributes.connectedAt) }}</dd></div>
+          </dl>
+
+          <div class="drawer-section">会话</div>
+          <dl class="kv two-col">
+            <div><dt>会话类型</dt>
+              <dd>{{ detail.attributes.persistent ? '持久(断开保留)' : '临时(断开即清)' }}</dd></div>
+            <div><dt>保留时长</dt><dd>{{ detail.attributes.expiry ?? '-' }}s</dd></div>
+            <div><dt>最近活跃</dt><dd>{{ timeStr(detail.attributes.lastActiveAt) }}</dd></div>
+            <div><dt>遗嘱消息</dt><dd>{{ detail.attributes.hasWill ? '有' : '无' }}</dd></div>
+          </dl>
+
+          <div class="drawer-section">发送缓冲</div>
+          <dl class="kv two-col">
+            <div><dt>在途(未确认 QoS 1/2)</dt><dd>{{ num(detail.attributes.inflight || 0) }}</dd></div>
+            <div><dt>排队</dt><dd>{{ num(detail.attributes.queued || 0) }}</dd></div>
+          </dl>
+
+          <div class="drawer-section">
+            订阅({{ detail.attributes.subs || 0 }})
+            <span v-if="detail.attributes.filtersTruncated" class="tag warn" style="margin-left:6px">
+              列表被截断(实际 {{ detail.attributes.subs }} 条)
+            </span>
+          </div>
+          <div class="filter-list">
+            <div v-for="f in (detail.attributes.filters || [])" :key="f" class="filter-row">
+              <button class="filter-name mono" @click="openFilter(f)"
+                      :title="'查看 ' + f + ' 的订阅者'">{{ f }}</button>
+              <button class="filter-act" @click="startCapture(f)"
+                      title="监听该过滤器的消息">监听</button>
+            </div>
+            <div v-if="!(detail.attributes.filters || []).length" class="hint">无订阅</div>
+          </div>
+        </template>
+      </template>
+
+      <template v-else>
+        <div v-if="filterLoading" class="loading" style="margin-top:12px">扫描各节点客户端中…</div>
+        <template v-else-if="filterDetail">
+          <dl class="kv two-col" style="margin-top:10px">
+            <div><dt>订阅者</dt><dd>{{ filterDetail.subscribers.length }} 个</dd></div>
+            <div><dt>扫描范围</dt><dd>{{ filterDetail.scanned }} 个客户端字段</dd></div>
+          </dl>
+          <div v-if="filterDetail.truncated" class="banner warn" style="margin:8px 0">
+            结果不完整(达到扫描或返回上限)—— 订阅数超过上报上限的客户端不会出现在这里
+          </div>
+          <div class="scroll" style="max-height:50vh">
+            <table>
+              <thead><tr><th>clientId</th><th>节点</th><th>在线时长</th></tr></thead>
+              <tbody>
+              <tr v-for="sub in filterDetail.subscribers"
+                  :key="sub.node + '/' + sub.clientId">
+                <td class="mono">{{ sub.clientId }}</td>
+                <td><span class="tag">{{ sub.node }}</span></td>
+                <td class="num">{{ onlineFor(sub.attributes.connectedAt) }}</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </template>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from '../api.js'
 import { duration, num } from '../format.js'
+import CaptureDialog from '../components/CaptureDialog.vue'
 
 const PAGE_SIZE = 100
 const AGGREGATE_LIMIT = 300
@@ -145,6 +249,27 @@ const total = ref(-1)
 const loading = ref(false)
 const aggregate = ref(null)
 const kickResult = ref(null)
+const drawer = ref({ open: false, view: 'client', client: null, filter: '' })
+const detail = ref(null)
+const detailLoading = ref(false)
+const filterDetail = ref(null)
+const filterLoading = ref(false)
+const captureOpen = ref(false)
+const captureFilter = ref('')
+const captureClientId = ref('')
+
+function startCapture(filter) {
+  captureFilter.value = filter
+  captureClientId.value = ''
+  captureOpen.value = true
+}
+
+/** 客户端维度: 抓该客户端的发布与收到(pub+sub) */
+function captureClient() {
+  captureFilter.value = ''
+  captureClientId.value = drawer.value.client?.clientId || ''
+  captureOpen.value = true
+}
 
 const nodeIds = computed(() => nodes.value.map((n) => n.node))
 const aggregateNote = computed(() => {
@@ -165,6 +290,60 @@ function onlineFor(connectedAt) {
     return '-'
   }
   return duration(Date.now() - connectedAt)
+}
+
+function timeStr(ts) {
+  return ts ? new Date(ts).toLocaleString() : '-'
+}
+
+/** 打开客户端详情抽屉: 行数据先渲染, 再向节点按需查询当下快照(含订阅) */
+async function openDetail(client) {
+  drawer.value = { open: true, view: 'client', client, filter: '' }
+  detail.value = client
+  detailLoading.value = true
+  try {
+    const { commandId } = await api.fetchClientDetail(client.node, client.clientId)
+    // 轮询命令结果(节点 500ms 轮询队列 + 执行, 一般 1~2 秒内回来)
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 400))
+      if (drawer.value.client !== client) {
+        return // 抽屉已切到别的客户端, 放弃本次查询
+      }
+      const result = await api.command(commandId)
+      if (result.state === 'COMPLETED' && result.snapshot) {
+        detail.value = { node: client.node, clientId: client.clientId,
+                         attributes: JSON.parse(result.snapshot) }
+        return
+      }
+      if (result.state && result.state !== 'PENDING' && result.state !== 'RECEIVED') {
+        return // 节点拒绝(如客户端已断开), 停在行数据
+      }
+    }
+  } catch (e) {
+    /* 查询失败就停在行数据 —— 列表快照可能旧了几秒, 但结构完整 */
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+/** 打开某订阅过滤器的订阅者清单(跨节点扫描) */
+async function openFilter(filter) {
+  drawer.value = { ...drawer.value, view: 'filter', filter }
+  filterDetail.value = null
+  filterLoading.value = true
+  try {
+    filterDetail.value = await api.filterDetail(filter)
+  } catch (e) {
+    filterDetail.value = { subscribers: [], scanned: 0, truncated: false, error: e.message }
+  } finally {
+    filterLoading.value = false
+  }
+}
+
+function closeDrawer() {
+  drawer.value = { open: false, view: 'client', client: null, filter: '' }
+  detail.value = null
+  filterDetail.value = null
 }
 
 async function loadNodes() {
@@ -272,8 +451,145 @@ function pollCommand(commandId, client) {
   }, 1000)
 }
 
+const route = useRoute()
+
 onMounted(async () => {
   await loadNodes()
+  // 从主题页「订阅者 → 详情」跳转进来: 按 clientId 过滤并直接打开详情浮窗
+  const jumpClientId = route.query.clientId
+  const jumpNode = route.query.node
+  if (jumpClientId) {
+    prefix.value = jumpClientId
+    if (jumpNode && nodeIds.value.includes(jumpNode)) {
+      node.value = jumpNode
+    }
+  }
   await reload()
+  if (jumpClientId && jumpNode) {
+    const target = entries.value.find(
+        (c) => c.clientId === jumpClientId && c.node === jumpNode)
+    if (target) {
+      openDetail(target)
+    }
+  }
 })
 </script>
+
+<style scoped>
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  width: min(640px, 92vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+/* 浮窗结构: 头部固定, 内容区滚动 —— 长订阅列表不会把关闭按钮顶出屏幕 */
+.modal-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+}
+
+.modal-body {
+  overflow-y: auto;
+  padding: 0 16px 20px;
+  flex: 1;
+}
+
+.drawer-section {
+  margin: 16px 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.kv.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+}
+
+.kv.two-col dt {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.kv.two-col dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.filter-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 订阅过滤器: 无边框、主题色文字, hover 下划线 —— 是链接不是标签 */
+.filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.filter-name {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--primary);
+  cursor: pointer;
+  text-align: left;
+  word-break: break-all;
+}
+
+.filter-name:hover {
+  text-decoration: underline;
+}
+
+/* 监听动作: 同一基线的小号文字链接, 不做按钮框 */
+.filter-act {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  cursor: pointer;
+  flex: none;
+}
+
+.filter-act:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+</style>

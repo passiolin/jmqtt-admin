@@ -27,7 +27,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * <p>如果改成在控制台配置里静态列出节点, 会立刻出现三个问题:
  * <ol>
  *   <li><b>扩容要在两个地方改。</b>加一个 broker 要改控制台配置并重启它,
- *       而控制台重启意味着所有进行中的排水流程状态丢失。</li>
+ *       而控制台重启意味着所有进行中的驱逐流程状态丢失。</li>
  *   <li><b>「配置里有、实际不存在」的节点会被显示成在线或离线, 而不是「不存在」。</b>
  *       运维看到的是一个说的通但错的视图 —— 比看不到更糟。</li>
  *   <li><b>节点挂了之后配置项还留着, 而它永远不会再回来。</b></li>
@@ -54,7 +54,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param precheckWindowMs             预检观测窗口。用来观察「停止调度之后, 新连接是否还在进来」
  * @param precheckGrowthThreshold      窗口内新增连接数超过该值即判定「LB 可能没有真正停止调度」
  * @param reconnectTimeoutSeconds      等待客户端重连到其他节点的时限
- * @param reconnectPollIntervalMs      排水流程的推进间隔
+ * @param reconnectPollIntervalMs      驱逐流程的推进间隔
  */
 @ConfigurationProperties(prefix = "jmqtt.admin")
 public record AdminProperties(

@@ -151,6 +151,10 @@ public class AdminRedis {
         }, Map.of());
     }
 
+    public List<String> lrange(String key, long start, long stop) {
+        return execute("lrange " + key, () -> commands().lrange(key, start, stop), List.of());
+    }
+
     public boolean exists(String key) {
         return Boolean.TRUE.equals(execute("exists " + key,
                 () -> commands().exists(key) > 0, Boolean.FALSE));
@@ -158,6 +162,16 @@ public class AdminRedis {
 
     public Set<String> smembers(String key) {
         return execute("smembers " + key, () -> commands().smembers(key), Set.of());
+    }
+
+    public boolean srem(String key, String member) {
+        Long removed = execute("srem " + key, () -> commands().srem(key, member), 0L);
+        return removed != null && removed > 0;
+    }
+
+    public long del(String... keys) {
+        Long removed = execute("del", () -> commands().del(keys), 0L);
+        return removed == null ? 0L : removed;
     }
 
     /**

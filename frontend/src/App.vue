@@ -26,7 +26,8 @@
         <router-link to="/overview">集群总览</router-link>
         <router-link to="/clients">客户端</router-link>
         <router-link to="/topics">主题</router-link>
-        <router-link to="/drain">节点排水</router-link>
+        <router-link to="/drain">客户端驱逐</router-link>
+        <router-link to="/captures">消息监听</router-link>
       </nav>
       <div class="sidebar-foot">
         <div>{{ username }}</div>

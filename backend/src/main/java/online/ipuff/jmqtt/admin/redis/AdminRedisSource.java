@@ -103,8 +103,23 @@ public final class AdminRedisSource implements AutoCloseable {
         }
 
         @Override
+        public Long srem(String key, String member) {
+            return c.srem(key, member);
+        }
+
+        @Override
+        public Long del(String... keys) {
+            return c.del(keys);
+        }
+
+        @Override
         public Long lpush(String key, String... values) {
             return c.lpush(key, values);
+        }
+
+        @Override
+        public List<String> lrange(String key, long start, long stop) {
+            return c.lrange(key, start, stop);
         }
 
         @Override
@@ -150,8 +165,23 @@ public final class AdminRedisSource implements AutoCloseable {
         }
 
         @Override
+        public Long srem(String key, String member) {
+            return c.srem(key, member);
+        }
+
+        @Override
+        public Long del(String... keys) {
+            return c.del(keys);
+        }
+
+        @Override
         public Long lpush(String key, String... values) {
             return c.lpush(key, values);
+        }
+
+        @Override
+        public List<String> lrange(String key, long start, long stop) {
+            return c.lrange(key, start, stop);
         }
 
         @Override

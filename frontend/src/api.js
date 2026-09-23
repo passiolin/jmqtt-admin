@@ -100,6 +100,20 @@ function qs(params) {
 }
 
 export const api = {
+  removeNode: (nodeId) => request('DELETE', `/api/nodes/${encodeURIComponent(nodeId)}`),
+  fetchClientDetail: (node, clientId) =>
+      request('POST', '/api/clients/fetch-detail', { node, clientId }),
+  startCapture: (node, filter, durationMinutes, maxMessages, clientId = undefined) =>
+      request('POST', '/api/captures', clientId
+          ? { node, clientId, durationMinutes, maxMessages }
+          : { node, filter, durationMinutes, maxMessages }),
+  captures: () => request('GET', '/api/captures'),
+  captureMessages: (captureId, limit = 200) =>
+      request('GET', `/api/captures/${encodeURIComponent(captureId)}/messages?limit=${limit}`),
+  deleteCapture: (captureId, node) =>
+      request('DELETE', `/api/captures/${encodeURIComponent(captureId)}?node=${encodeURIComponent(node)}`),
+  filterDetail: (filter, limit = 200) =>
+      request('GET', `/api/filters/detail?filter=${encodeURIComponent(filter)}&limit=${limit}`),
   // ---- 认证 ----
   login: (username, password) => request('POST', '/api/auth/login', { username, password }),
   logout: () => request('POST', '/api/auth/logout'),
@@ -129,7 +143,7 @@ export const api = {
   topicsAcrossNodes: (params) => request('GET', `/api/topics${qs(params)}`),
   overlap: (params) => request('GET', `/api/topics/overlap${qs(params)}`),
 
-  // ---- 排水 ----
+  // ---- 驱逐 ----
   createDrain: (body) => request('POST', '/api/drains', body),
   drains: () => request('GET', '/api/drains'),
   drain: (id) => request('GET', `/api/drains/${encodeURIComponent(id)}`),

@@ -67,6 +67,21 @@ public class AdminKeys {
         return prefix + ":admin:filters:" + nodeId;
     }
 
+    /** 全部监听任务 id */
+    public String captures() {
+        return prefix + ":admin:captures";
+    }
+
+    /** 监听任务元数据 */
+    public String capture(String captureId) {
+        return prefix + ":admin:capture:" + captureId;
+    }
+
+    /** 监听到的消息列表 */
+    public String captureMessages(String captureId) {
+        return prefix + ":admin:capture:" + captureId + ":msgs";
+    }
+
     public String commandQueue(String nodeId) {
         return prefix + ":admin:cmd:" + nodeId;
     }

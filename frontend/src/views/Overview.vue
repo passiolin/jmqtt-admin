@@ -60,6 +60,10 @@
               <span class="tag" :class="node.online ? 'ok' : 'danger'">
                 {{ node.online ? '在线' : '离线' }}
               </span>
+              <button v-if="!node.online" class="small danger" :disabled="removing === node.node"
+                      @click="removeNode(node.node)" :title="removingTitle(node.node)">
+                {{ removing === node.node ? '删除中…' : '删除' }}
+              </button>
             </div>
             <div class="card-body">
               <dl class="kv">
@@ -176,6 +180,26 @@ const totals = ref({ nodes: 0, onlineNodes: 0, connections: 0, sessions: 0 })
 const limits = ref({})
 const overlap = ref(null)
 const overlapBusy = ref(false)
+const removing = ref('')
+
+function removingTitle(nodeId) {
+  return removing.value === nodeId ? '正在删除' : '从注册表移除该离线节点及其遗留键'
+}
+
+async function removeNode(nodeId) {
+  if (!confirm(`确认删除离线节点「${nodeId}」？\n将移除它在注册表中的记录与全部遗留键, 不可恢复。`)) {
+    return
+  }
+  removing.value = nodeId
+  try {
+    await api.removeNode(nodeId)
+    await load()
+  } catch (e) {
+    alert('删除失败: ' + e.message)
+  } finally {
+    removing.value = ''
+  }
+}
 
 const mode = broadcastMode
 

@@ -105,10 +105,10 @@ public class ClusterQueryService {
     /**
      * 各<b>在线</b>节点的连接数快照。
      *
-     * <p>排水流程的每个推进周期都要读一次, 因此它必须比 {@link #nodes()} 便宜得多:
+     * <p>驱逐流程的每个推进周期都要读一次, 因此它必须比 {@link #nodes()} 便宜得多:
      * 只取一个字段, 不做 HLEN, 也不构造 NodeView。
      *
-     * <p><b>心跳过期的节点会被排除</b>, 而不是按 0 计入。这一点直接决定排水校验的正确性:
+     * <p><b>心跳过期的节点会被排除</b>, 而不是按 0 计入。这一点直接决定驱逐校验的正确性:
      * 若把一个已死节点按 0 计入「其他节点」, 它基线上的那些连接会被算成
      * 「迁移到了别的节点」—— 于是「客户端实际掉线了」被误判成「迁移成功」。
      */
@@ -210,6 +210,67 @@ public class ClusterQueryService {
             return null;
         }
         return new ClientEntry(nodeId, clientId, parse(json));
+    }
+
+    /**
+     * 某个订阅过滤器的全部订阅者 —— 扫描各节点的客户端注册表,
+     * 找出 filters 里包含该过滤器的客户端(精确匹配)。
+     *
+     * <p>这是「点开一个订阅 topic, 看谁在订阅它」的查询。数据来源是 broker 随客户端
+     * 状态发布的 filters 列表(有 max-filters-per-client 上限), 因此:
+     * <ul>
+     *   <li>订阅数超过上限的客户端, 其 filters 被截断 —— 该客户端可能订阅了
+     *       该过滤器却没出现在结果里(filtersTruncated 的客户端越少越可信)</li>
+     *   <li>返回的订阅者数<b>不一定等于</b>过滤器视图里的人数 —— 后者数的是订阅表,
+     *       这里数的是「上报了该过滤器的在线客户端」</li>
+     * </ul>
+     *
+     * @param filter 精确的过滤器串(不是主题名 —— 控制台没有主题→过滤器的反查数据)
+     * @param limit  最多返回多少个订阅者(截断时 truncated=true, matched 是已找到数)
+     */
+    public FilterDetail filterDetail(String filter, int limit) {
+        List<ClientEntry> subscribers = new ArrayList<>();
+        int scanned = 0;
+        boolean truncated = false;
+        for (String nodeId : new TreeSet<>(redis.smembers(keys.nodes()))) {
+            String cursor = "0";
+            int rounds = 0;
+            AdminRedis.ScanResult page;
+            do {
+                page = redis.scanHash(
+                        keys.clients(nodeId), cursor, properties.maxScanCount(), null);
+                rounds++;
+                for (Map.Entry<String, String> entry : page.entries().entrySet()) {
+                    scanned++;
+                    if (hasFilter(parse(entry.getValue()), filter)) {
+                        subscribers.add(new ClientEntry(nodeId, entry.getKey(), parse(entry.getValue())));
+                        if (subscribers.size() >= limit) {
+                            return new FilterDetail(filter, subscribers, scanned, true);
+                        }
+                    }
+                }
+                cursor = page.cursor();
+            } while (!page.finished() && rounds < MAX_SCAN_ROUNDS);
+            if (rounds >= MAX_SCAN_ROUNDS) {
+                truncated = true;
+            }
+        }
+        return new FilterDetail(filter, subscribers, scanned, truncated);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean hasFilter(Map<String, Object> attributes, String filter) {
+        Object filters = attributes.get("filters");
+        return filters instanceof List<?> list && list.contains(filter);
+    }
+
+    /**
+     * @param matched   找到并返回的订阅者数(达到 limit 即停, 结果是下界)
+     * @param scanned   实际扫描的客户端字段数 —— 说明「这个结论基于多少数据」
+     * @param truncated 是否未扫完(轮数上限或订阅者数上限)
+     */
+    public record FilterDetail(String filter, List<ClientEntry> subscribers,
+                               int scanned, boolean truncated) {
     }
 
     // ------------------------------------------------------------------
