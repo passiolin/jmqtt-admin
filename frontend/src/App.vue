@@ -28,6 +28,7 @@
         <router-link to="/topics">主题</router-link>
         <router-link to="/drain">客户端驱逐</router-link>
         <router-link to="/captures">消息监听</router-link>
+        <router-link to="/metrics">性能指标</router-link>
       </nav>
       <div class="sidebar-foot">
         <div>{{ username }}</div>

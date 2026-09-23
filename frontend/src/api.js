@@ -103,6 +103,10 @@ export const api = {
   removeNode: (nodeId) => request('DELETE', `/api/nodes/${encodeURIComponent(nodeId)}`),
   fetchClientDetail: (node, clientId) =>
       request('POST', '/api/clients/fetch-detail', { node, clientId }),
+  // 采集器定时采集并存 Redis 的指标历史(oldest → newest)。
+  // 粒度由跨度决定: ≤1h 分钟, ≤24h 小时, 更长按天
+  nodeMetricsSeries: (node, from, to) =>
+      request('GET', `/api/nodes/${encodeURIComponent(node)}/metrics?from=${from}&to=${to}`),
   startCapture: (node, filter, durationMinutes, maxMessages, clientId = undefined) =>
       request('POST', '/api/captures', clientId
           ? { node, clientId, durationMinutes, maxMessages }

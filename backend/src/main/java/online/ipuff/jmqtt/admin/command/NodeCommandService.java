@@ -85,6 +85,14 @@ public class NodeCommandService {
     }
 
     /**
+     * 查询节点运行时指标(累计计数 + 内存采样序列)。
+     * 指标由节点自算自存, 这里只按需下发查询命令 —— 指标链路无常驻 Redis 写入。
+     */
+    public String nodeMetrics(String nodeId) {
+        return dispatch(nodeId, base("METRICS"));
+    }
+
+    /**
      * 开始一个消息监听任务(参数校验后的上限在 broker 侧再拦一次)。
      */
     public String captureStart(String nodeId, String captureId, String filter,

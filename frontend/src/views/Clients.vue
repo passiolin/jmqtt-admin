@@ -127,10 +127,9 @@
     {{ kickResult.text }}
   </div>
 
-  <CaptureDialog :open="captureOpen" :node="drawer.client?.node || ''"
+  <CaptureDialog :open="captureOpen" :node="captureNode"
                  :filter="captureFilter || ''" :client-id="captureClientId"
-                 @close="captureOpen = false"
-                 @started="closeDrawer"/>
+                 @close="captureOpen = false"/>
 
   <!-- 客户端详情浮窗: 两级视图 —— 客户端详情 / 订阅者清单 -->
   <div v-if="drawer.open" class="modal-mask" @click.self="closeDrawer">
@@ -140,7 +139,7 @@
         <div>
           <span class="tag">{{ drawer.client.node }}</span>
           <span v-if="detail?.attributes.persistent" class="tag ok" style="margin-left:4px">持久会话</span>
-          <button class="small" style="margin-left:8px" title="监听该客户端发布与收到的全部消息"
+          <button class="small" style="margin-left:8px" title="监听该客户端发布与订阅的全部消息"
                   @click="captureClient">监听</button>
           <button class="small" style="margin-left:4px" @click="closeDrawer">关闭</button>
         </div>
@@ -255,20 +254,26 @@ const detailLoading = ref(false)
 const filterDetail = ref(null)
 const filterLoading = ref(false)
 const captureOpen = ref(false)
+const captureNode = ref('')
 const captureFilter = ref('')
 const captureClientId = ref('')
 
+/** 发起监听: 参数先从详情浮窗快照出来, 随即关闭浮窗 —— 监听配置单独呈现, 不叠两层 */
 function startCapture(filter) {
+  captureNode.value = drawer.value.client?.node || ''
   captureFilter.value = filter
   captureClientId.value = ''
   captureOpen.value = true
+  closeDrawer()
 }
 
-/** 客户端维度: 抓该客户端的发布与收到(pub+sub) */
+/** 客户端维度: 抓该客户端的发布与订阅(pub+sub) */
 function captureClient() {
+  captureNode.value = drawer.value.client?.node || ''
   captureFilter.value = ''
   captureClientId.value = drawer.value.client?.clientId || ''
   captureOpen.value = true
+  closeDrawer()
 }
 
 const nodeIds = computed(() => nodes.value.map((n) => n.node))

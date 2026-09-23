@@ -155,6 +155,25 @@ public class AdminRedis {
         return execute("lrange " + key, () -> commands().lrange(key, start, stop), List.of());
     }
 
+    public String lindex(String key, long index) {
+        return execute("lindex " + key, () -> commands().lindex(key, index), null);
+    }
+
+    /**
+     * LPUSH + LTRIM: 头插并截断到上限, 用于「新的在左」的有界序列(指标历史帧)。
+     */
+    public void listPushTruncate(String key, String value, int maxLength) {
+        execute("lpush " + key, () -> {
+            commands().lpush(key, value);
+            commands().ltrim(key, 0, maxLength - 1L);
+            return Boolean.TRUE;
+        }, Boolean.FALSE);
+    }
+
+    public void expire(String key, long seconds) {
+        execute("expire " + key, () -> commands().expire(key, seconds), Boolean.FALSE);
+    }
+
     public boolean exists(String key) {
         return Boolean.TRUE.equals(execute("exists " + key,
                 () -> commands().exists(key) > 0, Boolean.FALSE));

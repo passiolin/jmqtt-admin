@@ -57,16 +57,19 @@ public class AdminApiController {
     private final AdminProperties properties;
     private final NodeRegistryService registry;
     private final AdminKeys keys;
+    private final online.ipuff.jmqtt.admin.metrics.NodeMetricsStore metricsStore;
 
     public AdminApiController(ClusterQueryService query, NodeCommandService commands,
                               AdminRedis redis, AdminProperties properties,
-                              NodeRegistryService registry, AdminKeys keys) {
+                              NodeRegistryService registry, AdminKeys keys,
+                              online.ipuff.jmqtt.admin.metrics.NodeMetricsStore metricsStore) {
         this.query = query;
         this.commands = commands;
         this.redis = redis;
         this.properties = properties;
         this.registry = registry;
         this.keys = keys;
+        this.metricsStore = metricsStore;
     }
 
     // ------------------------------------------------------------------
@@ -167,6 +170,20 @@ public class AdminApiController {
 
     /** {@link #fetchClientDetail} 的请求体 */
     public record FetchDetailRequest(String node, String clientId) {
+    }
+
+    /**
+     * 节点指标历史(采集器定时从节点拉取并存 Redis, 这里直接读存储, 不等节点)。
+     * 粒度由跨度自动决定: ≤1 小时分钟, ≤24 小时小时, 更长按天;
+     * 细粒度帧不足时自动落到更粗一级。返回 oldest → newest 的帧序列。
+     */
+    @GetMapping("/nodes/{node}/metrics")
+    public ResponseEntity<Map<String, Object>> nodeMetrics(@PathVariable String node,
+                                                           @RequestParam(required = false) Long from,
+                                                           @RequestParam(required = false) Long to) {
+        long toTs = to != null ? to : System.currentTimeMillis();
+        long fromTs = from != null ? from : toTs - 21600000L;
+        return ResponseEntity.ok(ApiResponse.ok(metricsStore.read(node, fromTs, toTs)));
     }
 
     /**

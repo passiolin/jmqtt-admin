@@ -21,6 +21,7 @@ import Clients from './views/Clients.vue'
 import Topics from './views/Topics.vue'
 import Drain from './views/Drain.vue'
 import Captures from './views/Captures.vue'
+import Metrics from './views/Metrics.vue'
 import { getToken } from './api.js'
 import './styles.css'
 
@@ -31,6 +32,7 @@ const routes = [
   { path: '/topics', component: Topics, meta: { title: '主题' } },
   { path: '/drain', component: Drain, meta: { title: '客户端驱逐' } },
   { path: '/captures', component: Captures, meta: { title: '消息监听' } },
+  { path: '/metrics', component: Metrics, meta: { title: '性能指标' } },
   { path: '/login', component: Login, meta: { title: '登录', public: true } }
 ]
 

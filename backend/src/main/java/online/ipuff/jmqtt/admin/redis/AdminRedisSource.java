@@ -126,6 +126,16 @@ public final class AdminRedisSource implements AutoCloseable {
         public String ltrim(String key, long start, long stop) {
             return c.ltrim(key, start, stop);
         }
+
+        @Override
+        public String lindex(String key, long index) {
+            return c.lindex(key, index);
+        }
+
+        @Override
+        public boolean expire(String key, long seconds) {
+            return c.expire(key, seconds);
+        }
     }
 
     private record ClusterCommands(RedisAdvancedClusterCommands<String, String> c) implements AdminCommands {
@@ -187,6 +197,16 @@ public final class AdminRedisSource implements AutoCloseable {
         @Override
         public String ltrim(String key, long start, long stop) {
             return c.ltrim(key, start, stop);
+        }
+
+        @Override
+        public String lindex(String key, long index) {
+            return c.lindex(key, index);
+        }
+
+        @Override
+        public boolean expire(String key, long seconds) {
+            return c.expire(key, seconds);
         }
     }
 }

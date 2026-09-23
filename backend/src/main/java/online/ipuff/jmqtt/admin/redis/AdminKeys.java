@@ -89,4 +89,23 @@ public class AdminKeys {
     public String commandResult(String commandId) {
         return prefix + ":admin:cmdr:" + commandId;
     }
+
+    /**
+     * 节点指标历史(控制台采集器写入, 新的在左, LTRIM 到保留上限)。
+     * 这个键由控制台拥有: broker 只回答当前值, 存历史是控制台的事。
+     * 三种粒度: 分钟(原始帧)/小时/天 —— 汇总帧在整点/整天跨越时写入。
+     */
+    public String metrics(String nodeId) {
+        return prefix + ":admin:metrics:" + nodeId;
+    }
+
+    /** 小时粒度指标历史 */
+    public String metricsHour(String nodeId) {
+        return prefix + ":admin:metrics:h:" + nodeId;
+    }
+
+    /** 天粒度指标历史 */
+    public String metricsDay(String nodeId) {
+        return prefix + ":admin:metrics:d:" + nodeId;
+    }
 }

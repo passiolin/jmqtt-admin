@@ -59,5 +59,9 @@ public interface AdminCommands {
 
     List<String> lrange(String key, long start, long stop);
 
+    String lindex(String key, long index);
+
     String ltrim(String key, long start, long stop);
+
+    boolean expire(String key, long seconds);
 }

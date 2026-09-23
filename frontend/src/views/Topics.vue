@@ -114,8 +114,9 @@
     <div class="modal">
       <div class="modal-head">
         <h2 class="mono" style="font-size:13.5px;word-break:break-all">{{ subFilter }}</h2>
-        <button class="small" :disabled="!captureNode"
-                @click="captureOpen = true" :title="captureNode ? '' : '多节点分布时请在上方选择节点'">
+        <button class="small" :disabled="!resolvedCaptureNode"
+                @click="startCapture"
+                :title="resolvedCaptureNode ? '' : '多节点分布时请在上方选择节点'">
           监听
         </button>
       </div>
@@ -152,8 +153,7 @@
     </div>
   </div>
   <CaptureDialog :open="captureOpen" :node="captureNode" :filter="subFilter"
-                 @close="captureOpen = false"
-                 @started="closeSubscribers"/>
+                 @close="captureOpen = false"/>
 
 </template>
 
@@ -187,15 +187,23 @@ const subFilter = ref('')
 const subDetail = ref(null)
 const subLoading = ref(false)
 const captureOpen = ref(false)
+const captureNode = ref('')
 
 /** 监听要发往具体节点: 订阅者全在一个节点时用它, 否则用当前筛选的节点(全部时禁用) */
-const captureNode = computed(() => {
+const resolvedCaptureNode = computed(() => {
   const subs = subDetail.value?.subscribers || []
   if (subs.length === 1) {
     return subs[0].node
   }
   return node.value || ''
 })
+
+/** 发起监听: 节点先从订阅者浮窗快照出来, 随即关闭浮窗 —— 监听配置单独呈现, 不叠两层 */
+function startCapture() {
+  captureNode.value = resolvedCaptureNode.value
+  captureOpen.value = true
+  closeSubscribers()
+}
 
 function onlineFor(connectedAt) {
   return connectedAt ? duration(Date.now() - connectedAt) : '-'

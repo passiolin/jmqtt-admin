@@ -65,14 +65,38 @@ jmqtt:
     # ★ key-prefix 必须与 broker 的 jmqtt.broker.redis.key-prefix 一致。
     # 两个工程之间唯一的契约就是「键长什么样」, 配错了不报错, 只表现为「控制台里一个人都没有」
     redis:
-      mode: standalone
-      password:
+      mode: cluster
+      password: nwRyyb6bLyVk8fZV
       database: 0
       key-prefix: jmqtt
       command-timeout-ms: 3000
-      nodes: []
+      nodes:
+        - 10.10.10.248:6379
+        - 10.10.10.248:6380
+        - 10.10.10.248:6381
+        - 10.10.10.248:6382
+        - 10.10.10.248:6383
+        - 10.10.10.248:6384
     # Redis 探活间隔。控制台不做静默重试, 这是「Redis 回来了」的唯一发现途径
     redis-health-interval-ms: 5000
+
+    # ---- 节点指标采集 ----
+    # 采集器定时向每个在线节点下发 METRICS 命令(节点只维护当前累计值),
+    # 结果按 分/时/天 三级粒度写进 {prefix}:admin:metrics[:h|:d]:{node} 的 LIST(新的在左)。
+    metrics:
+      # 采集间隔。分钟粒度的帧距 = 这个间隔; 小时/天帧在跨越桶边界时汇总写入
+      collect-interval-ms: ${JMQTT_ADMIN_METRICS_COLLECTINTERVALMS:30000}
+      # 分钟帧(原始采样)保留帧数与 TTL: 1440 帧 x 30s = 12 小时
+      minute-max-samples: ${JMQTT_ADMIN_METRICS_MINUTEMAXSAMPLES:1440}
+      minute-ttl-seconds: ${JMQTT_ADMIN_METRICS_MINUTETTLSECONDS:172800}
+      # 小时帧: 720 帧 = 30 天
+      hour-max-samples: ${JMQTT_ADMIN_METRICS_HOURMAXSAMPLES:720}
+      hour-ttl-seconds: ${JMQTT_ADMIN_METRICS_HOURTTLSECONDS:2678400}
+      # 天帧: 31 帧 ≈ 1 个月 —— 全局存储上限 30 天
+      day-max-samples: ${JMQTT_ADMIN_METRICS_DAYMAXSAMPLES:31}
+      day-ttl-seconds: ${JMQTT_ADMIN_METRICS_DAYTTLSECONDS:2678400}
+      # 在途命令等待上限(节点掉线时丢这一帧, 不重试)
+      result-timeout-ms: ${JMQTT_ADMIN_METRICS_RESULTTIMEOUTMS:15000}
 
 logging:
   level:
