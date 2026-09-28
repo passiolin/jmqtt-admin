@@ -1,0 +1,29 @@
+# 用法: 在本目录执行 docker compose up -d
+# 镜像由 build.sh 产出; 本文件只负责运行参数。
+services:
+  jmqtt-admin:
+    image: jmqtt-admin:latest
+    container_name: jmqtt-admin
+    restart: unless-stopped
+    ports:
+      # 管理台是内网工具: 只绑本机, 远程访问走 SSH 隧道或内网反代(反代上做 TLS)
+      - "127.0.0.1:9100:9100"
+    environment:
+      TZ: Asia/Shanghai
+      # 镜像内已带同样的默认值, 这里显式写出便于按需调整
+      JAVA_OPTS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+      # Redis 连接(Spring Boot 松散绑定), 不设置则用 application.yml 内置值。
+      # ★ key-prefix 必须与 broker 的 jmqtt.broker.redis.key-prefix 一致,
+      #   配错不报错, 只表现为「控制台里一个节点都没有」
+      # JMQTT_ADMIN_REDIS_MODE: cluster            # cluster | standalone | sentinel
+      # JMQTT_ADMIN_REDIS_NODES: "10.0.0.6:6379"   # 逗号分隔; standalone 也走这个字段
+      # JMQTT_ADMIN_REDIS_PASSWORD: "..."
+      # JMQTT_ADMIN_REDIS_DATABASE: 0
+      # JMQTT_ADMIN_REDIS_KEY_PREFIX: jmqtt
+      # 登录凭据(默认 jmqtt/jmqtt, 仅内网; 暴露面变大应接统一登录而非加密码策略)
+      # JMQTT_ADMIN_USERNAME: jmqtt
+      # JMQTT_ADMIN_PASSWORD: jmqtt
+      # 挂载的自定义路径配置文件(文件名任意, 覆盖优先级高于环境变量):
+      # SPRING_CONFIG_ADDITIONAL_LOCATION: "file:/etc/jmqtt-admin/overrides.yml"
+    mem_limit: 512m
+    # healthcheck 已在镜像里定义(对 9100 建 TCP 连接), 无需重复声明

@@ -7,7 +7,8 @@ MQTT 集群管理台。看到集群里有什么、把某个节点的客户端迁
 ```
 jmqtt-admin/
 ├── backend/    Spring Boot 2.7.18 + Java 21, 只提供 /api, 不含任何页面
-└── frontend/   Vue 3 + Vite, 产物在 frontend/dist 由前端独立部署(Nginx/CDN)
+├── frontend/   Vue 3 + Vite, 产物在 frontend/dist 由前端独立部署(Nginx/CDN)
+└── deploy/     Docker 部署: 前端产物打进后端 jar, 单镜像单端口, 见 deploy/README.md
 ```
 
 ---
@@ -52,7 +53,8 @@ mvn clean package
 java -jar target/jmqtt-admin-backend-0.1.0-SNAPSHOT.jar
 ```
 
-启动后监听 `9100`，前端已包含在 jar 内：<http://127.0.0.1:9100>
+启动后监听 `9100`。注意这条命令只产出 API jar（不含前端）；
+要把前端打进同一个 jar / 同一个 Docker 镜像，用 [`deploy/build.sh`](deploy/README.md)。
 
 ### 前端
 
@@ -64,7 +66,8 @@ npm install
 npm run dev        # http://127.0.0.1:5173, /api 代理到 9100
 ```
 
-生产构建，两条路径产出一致（都输出到 `backend/src/main/resources/static`）：
+生产构建，两条路径产出一致（都输出到 `frontend/dist`；
+`deploy/build.sh` 负责把它拷进 backend 再打进 jar）：
 
 ```bash
 npm run build        # 标准路径: Vite
