@@ -23,6 +23,70 @@
 
   <div class="card">
     <div class="card-head">
+      <h2>详细操作步骤</h2>
+      <span style="font-size:12px;color:var(--text-dim)">
+        停机 / 升级 / 重启节点前, 按以下顺序把该节点客户端迁空
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="guide-step">
+        <div class="n">1</div>
+        <div class="body">
+          <div class="t">前提: 必须是多节点部署</div>
+          <div class="d">
+            驱逐的目的是把客户端迁到其他节点 —— 执行前必须确认除目标节点外至少还有一个节点在线,
+            且 LB 正在正常向它调度新连接。单节点部署下不要驱逐: 客户端断开后只会回连到同一个节点,
+            连接数不会下降, 反而白白触发一轮遗嘱发布与重连。同时确认其他节点有承接余量
+            (连接数、CPU、内存) —— 驱逐迁移的是压力, 不是消除压力。
+          </div>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="n">2</div>
+        <div class="body">
+          <div class="t">在 LB 层断掉目标节点的调度配置</div>
+          <div class="d">
+            在负载均衡 / 网关 / K8s 里把该节点从后端组移除 (权重置 0、readiness 置否等),
+            等健康检查生效, 让新连接不再进入该节点。
+            <b>注意: 摘掉配置后 LB 只是不再调度新连接, 不会主动断开既有连接</b>,
+            而 MQTT 是长连接, 靠客户端自然断开消亡太慢 —— 所以这一步只是「堵住进水口」,
+            把存量客户端迁走要靠下面的驱逐。
+          </div>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="n">3</div>
+        <div class="body">
+          <div class="t">小批量驱逐客户端, 观察重连情况</div>
+          <div class="d">
+            先用很小的量创建任务 (例如
+            <span class="mono">count=50 / 每批 10 / 间隔 1000ms</span>),
+            走完「预检 → 确认已停调度 → 分批驱逐 → 等待重连」的完整流程。
+            重点同时看两边: 目标节点连接数在降、其他节点连接数在涨 ——
+            只看一边无法区分「迁走了」与「连不上了」。若目标节点不降 (客户端回连到了原节点)、
+            其他节点不涨 (客户端没重连上) 或消息延迟明显放大, 先中止任务排查, 不要急着加大力度。
+          </div>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="n">4</div>
+        <div class="body">
+          <div class="t">逐步加大驱逐力度, 全部迁空后才能停机 / 升级</div>
+          <div class="d">
+            小批量验证没问题后, 再逐步放大比例与批次节奏 (仍受单次上限
+            {{ num(limits.maxEvictPerTask) }} 条约束), 分多个任务把该节点的客户端全部迁走。
+            收尾判定: 该节点连接数归零, 且其他节点承接了相应的量。
+            <b>只有到这一步才能对节点做停机、升级、重启等操作</b> ——
+            连接没清空就停机, 剩余客户端会被一次性断开,
+            等于把前面控制好节奏的迁移变回一次遗嘱风暴 + 重连风暴。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
       <h2>新建驱逐任务</h2>
     </div>
     <div class="card-body">
