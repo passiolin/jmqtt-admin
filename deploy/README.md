@@ -69,7 +69,7 @@ application.yml 的值均可用环境变量覆盖(Spring Boot 松散绑定,
 | `JMQTT_ADMIN_REDIS_PASSWORD` | Redis 密码 | (见 application.yml) |
 | `JMQTT_ADMIN_REDIS_DATABASE` | Redis database | 0 |
 | `JMQTT_ADMIN_REDIS_KEY_PREFIX` | ★ key 前缀,必须与 broker 一致 | jmqtt |
-| `JMQTT_ADMIN_REDIS_COMMANDTIMEOUTMS` | Redis 命令超时 | 3000 |
+| `JMQTT_ADMIN_REDIS_COMMAND_TIMEOUT_MS` | Redis 命令超时 | 3000 |
 
 **自定义路径的配置文件**(docker 挂载场景, 文件名可自定义, 与环境变量并存且优先级更高):
 
