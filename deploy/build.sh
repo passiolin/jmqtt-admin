@@ -14,6 +14,7 @@
 #
 # 环境变量:
 #   IMAGE_NAME     镜像名, 默认 jmqtt-admin
+#   VERSION        镜像版本 tag, 默认从 backend/pom.xml 解析; 例: VERSION=1.2.0 ./build.sh
 #   FRONTEND_BUILD 前端构建路径: vite(默认) | nowasm。受限环境(Wasm 被禁用或
 #                  ulimit 限制虚拟内存)下 vite 会以 WebAssembly.instantiate():
 #                  Out of memory 失败, 用 nowasm 绕开 —— 见主 README「为什么有两条构建路径」
@@ -26,10 +27,11 @@ IMAGE_NAME="${IMAGE_NAME:-jmqtt-admin}"
 FRONTEND_BUILD="${FRONTEND_BUILD:-vite}"
 MAVEN_ARGS="${MAVEN_ARGS:-}"
 
-# pom.xml 里本项目自己的 <version> 紧跟在 <artifactId>jmqtt-admin-backend</artifactId> 之后
-VERSION="$(sed -n '/<artifactId>jmqtt-admin-backend<\/artifactId>/{n;p}' backend/pom.xml | sed -e 's:.*<version>\(.*\)</version>.*:\1:')"
+# 版本号: 支持环境变量传入(VERSION=1.2.0 ./build.sh), 未设置时从 pom.xml 里
+# <artifactId>jmqtt-admin-backend</artifactId> 的下一行解析
+VERSION="${VERSION:-$(sed -n '/<artifactId>jmqtt-admin-backend<\/artifactId>/{n;p}' backend/pom.xml | sed -e 's:.*<version>\(.*\)</version>.*:\1:')}"
 if [[ -z "$VERSION" ]]; then
-    echo "无法从 backend/pom.xml 解析版本号" >&2
+    echo "无法解析版本号(未设置 VERSION, 且无法从 backend/pom.xml 解析)" >&2
     exit 1
 fi
 

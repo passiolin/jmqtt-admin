@@ -15,6 +15,11 @@ deploy/build.sh --skip-tests  # 跳过后端测试
 脚本流程:前端构建(frontend/dist)→ 拷入 `backend/src/main/resources/static` → `mvn package`
 → jar 暂存为 `deploy/app.jar` → `docker build`(构建上下文只有 deploy/)。
 产出 `jmqtt-admin:<version>` 与 `jmqtt-admin:latest` 两个 tag。
+版本号默认从 `backend/pom.xml` 解析,可用环境变量覆盖:
+
+```bash
+VERSION=1.2.0 deploy/build.sh    # 产出 jmqtt-admin:1.2.0 / jmqtt-admin:latest
+```
 
 受限环境下:
 
