@@ -22,12 +22,9 @@ EXPOSE 9100
 # 容器内存感知: 管理台很轻, 堆占容器内存的 75% 足够
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
-# 与 broker 同一思路: 端口能建立 TCP 连接即视为健康(liveness 语义)。
-# 注意: 若运行时用 SERVER_PORT 改了端口, 这里要跟着改(compose 里覆盖 healthcheck)。
-# Redis 依赖与否不该进 healthcheck —— Redis 挂了重启容器解决不了问题;
-# 要判断「控制台可用」用外部探针打 /actuator/health(含 Redis 探活)。
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/9100' || exit 1
+# 故意不内置 HEALTHCHECK: 探针端口写死, 与运行时可改的 SERVER_PORT 一旦漂移
+# 就会永久误报 unhealthy。Redis 等依赖也不该进 healthcheck —— 依赖挂了重启容器
+# 解决不了问题; 要「控制台可用」语义用外部探针打 /actuator/health(含 Redis 探活)。
 
 # sh -c 是为了运行时展开 $JAVA_OPTS
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

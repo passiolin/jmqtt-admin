@@ -82,9 +82,11 @@ JVM 参数通过 `JAVA_OPTS` 覆盖,默认 `-XX:MaxRAMPercentage=75.0 -XX:+ExitO
 
 ## 注意
 
-- **健康检查**写死了 9100(liveness 语义:端口能建 TCP 连接即健康);若用 `SERVER_PORT`
-  改端口,需在 compose 里覆盖 `healthcheck`。要判断「控制台真的可用」(含 Redis 探活),
-  用外部探针打 `/actuator/health`,不要放进 HEALTHCHECK —— Redis 挂了重启容器解决不了问题。
+- **健康检查**:镜像不内置 Docker healthcheck——探针端口写死,与运行时可改的
+  `SERVER_PORT` 漂移后会永久误报 unhealthy。旧镜像若仍带探针,可在 compose 里
+  `healthcheck: {disable: true}` 或 `docker run --no-healthcheck` 关闭。
+  要判断「控制台真的可用」(含 Redis 探活),用外部探针打 `/actuator/health`,
+  不要放进 HEALTHCHECK —— Redis 挂了重启容器解决不了问题。
 - **控制台只连 Redis**,不直连任何 broker;部署上只需要它能到达 Redis。
 - **key-prefix 配错不会报错**,只表现为「控制台里一个节点都没有」—— 与 broker 的
   `jmqtt.broker.redis.key-prefix` 保持一致。
